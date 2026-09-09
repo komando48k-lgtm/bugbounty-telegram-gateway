@@ -2,6 +2,11 @@ name: Hermes Gateway (temporary runner)
 
 on:
   workflow_dispatch:
+    inputs:
+      pairing_code:
+        description: "One-time Hermes Telegram pairing code"
+        required: false
+        type: string
   schedule:
     - cron: "17 */6 * * *"
 
@@ -50,6 +55,14 @@ jobs:
             default: opencode-free
             provider: opencode-free
           YAML
+
+      - name: Approve Telegram pairing (optional)
+        if: ${{ inputs.pairing_code != '' }}
+        shell: bash
+        env:
+          PAIRING_CODE: ${{ inputs.pairing_code }}
+        run: |
+          hermes pairing approve telegram "$PAIRING_CODE"
 
       - name: Start Hermes Telegram gateway
         shell: bash
