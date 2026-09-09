@@ -1,0 +1,57 @@
+name: Hermes Gateway (temporary runner)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Checkout official Hermes Agent
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Install Hermes Agent from official installer
+        shell: bash
+        run: |
+          curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+          source ~/.bashrc || true
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          hermes --version
+
+      - name: Configure Telegram securely
+        shell: bash
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ALLOWED_USERS: ${{ secrets.TELEGRAM_ALLOWED_USERS }}
+        run: |
+          mkdir -p "$HOME/.hermes"
+          {
+            printf 'TELEGRAM_BOT_TOKEN=%s\n' "$TELEGRAM_BOT_TOKEN"
+            printf 'TELEGRAM_ALLOWED_USERS=%s\n' "$TELEGRAM_ALLOWED_USERS"
+          } > "$HOME/.hermes/.env"
+          chmod 600 "$HOME/.hermes/.env"
+
+      - name: Configure a keyless model provider
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.hermes"
+          cat > "$HOME/.hermes/config.yaml" <<'YAML'
+          model:
+            default: opencode-free
+            provider: opencode-free
+          YAML
+
+      - name: Start Hermes Telegram gateway
+        shell: bash
+        run: |
+          hermes gateway run
