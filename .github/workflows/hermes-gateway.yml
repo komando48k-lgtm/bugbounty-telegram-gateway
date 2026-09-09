@@ -2,11 +2,6 @@ name: Hermes Gateway (temporary runner)
 
 on:
   workflow_dispatch:
-    inputs:
-      pairing_code:
-        description: "One-time Hermes Telegram pairing code"
-        required: false
-        type: string
   schedule:
     - cron: "17 */6 * * *"
 
@@ -39,6 +34,14 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ALLOWED_USERS: ${{ secrets.TELEGRAM_ALLOWED_USERS }}
         run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ]; then
+            echo "TELEGRAM_BOT_TOKEN secret is required."
+            exit 1
+          fi
+          if [ -z "${TELEGRAM_ALLOWED_USERS:-}" ]; then
+            echo "TELEGRAM_ALLOWED_USERS secret is required."
+            exit 1
+          fi
           mkdir -p "$HOME/.hermes"
           {
             printf 'TELEGRAM_BOT_TOKEN=%s\n' "$TELEGRAM_BOT_TOKEN"
@@ -55,14 +58,6 @@ jobs:
             default: opencode-free
             provider: opencode-free
           YAML
-
-      - name: Approve Telegram pairing (optional)
-        if: ${{ inputs.pairing_code != '' }}
-        shell: bash
-        env:
-          PAIRING_CODE: ${{ inputs.pairing_code }}
-        run: |
-          hermes pairing approve telegram "$PAIRING_CODE"
 
       - name: Start Hermes Telegram gateway
         shell: bash
