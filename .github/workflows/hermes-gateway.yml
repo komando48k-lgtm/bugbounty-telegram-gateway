@@ -19,6 +19,16 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+      - name: Install security and browser dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            nmap dnsutils whois curl jq git ripgrep python3-pip \
+            chromium-browser || sudo apt-get install -y --no-install-recommends chromium
+          python3 -m pip install --user --upgrade pip
+          python3 -m pip install --user ddgs
+
       - name: Install Hermes Agent from official installer
         shell: bash
         run: |
@@ -49,7 +59,7 @@ jobs:
           } > "$HOME/.hermes/.env"
           chmod 600 "$HOME/.hermes/.env"
 
-      - name: Configure a keyless model provider
+      - name: Configure Hermes full toolset
         shell: bash
         run: |
           mkdir -p "$HOME/.hermes"
@@ -57,7 +67,99 @@ jobs:
           model:
             default: opencode-free
             provider: opencode-free
+
+          web:
+            backend: ddgs
+
+          browser:
+            cloud_provider: local
+            backend: local
+            headed: false
+            inactivity_timeout: 3300
+
+          terminal:
+            backend: local
+            cwd: "."
+            timeout: 180
+            persistent_shell: true
+
+          platform_toolsets:
+            telegram:
+              - hermes-telegram
+              - web
+              - search
+              - terminal
+              - file
+              - browser
+              - vision
+              - skills
+              - todo
+              - cronjob
+              - memory
+              - session_search
+              - code_execution
+              - delegation
+              - clarify
+              - debugging
+              - safe
           YAML
+
+          hermes config check || true
+          hermes chat --list-toolsets || true
+
+      - name: Prepare browser runtime
+        shell: bash
+        run: |
+          if command -v chromium >/dev/null 2>&1; then
+            echo "Chromium available: $(command -v chromium)"
+          elif command -v chromium-browser >/dev/null 2>&1; then
+            echo "Chromium available: $(command -v chromium-browser)"
+          else
+            echo "Chromium was not installed; Hermes browser will report unavailable."
+          fi
+
+      - name: Seed security-focused working skills
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.hermes/skills"
+          cat > "$HOME/.hermes/skills/authorized-web-security/skill.md" <<'SKILL'
+          ---
+          name: authorized-web-security
+          description: Defensive web security workflow for assets the user is explicitly authorized to test.
+          ---
+          # Authorized Web Security
+          - Confirm the target and authorization/scope before active testing.
+          - Prefer passive discovery first, then low-impact validation.
+          - Use browser, web search, DNS tools, and terminal tools only within scope.
+          - Avoid destructive actions, persistence, credential attacks, or denial-of-service.
+          - Record evidence, reproduction steps, impact, and remediation clearly.
+          - For bug bounty work, map findings to the program rules and avoid out-of-scope assets.
+          SKILL
+
+          cat > "$HOME/.hermes/skills/recon-and-triage/skill.md" <<'SKILL'
+          ---
+          name: recon-and-triage
+          description: Scope-aware reconnaissance and vulnerability triage workflow.
+          ---
+          # Recon and Triage
+          - Build an asset inventory from explicitly authorized scope.
+          - Use DNS, HTTP metadata, technologies, and public information for passive discovery.
+          - Prioritize likely attack surfaces without broad unsolicited scanning.
+          - Validate suspected issues with minimal-impact requests.
+          - Keep a structured evidence log and confidence level for every finding.
+          SKILL
+
+          cat > "$HOME/.hermes/skills/secure-development/skill.md" <<'SKILL'
+          ---
+          name: secure-development
+          description: Secure coding, code review, testing, and remediation workflow.
+          ---
+          # Secure Development
+          - Review code for common security weaknesses and unsafe defaults.
+          - Suggest minimal, testable fixes with regression tests.
+          - Explain root cause, impact, and verification criteria.
+          - Prefer reproducible local tests and safe fixtures.
+          SKILL
 
       - name: Start Hermes Telegram gateway
         shell: bash
